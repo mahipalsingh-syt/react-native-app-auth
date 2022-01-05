@@ -411,7 +411,8 @@ public class RNAppAuthModule extends ReactContextBaseJavaModule implements Activ
             AuthorizationException ex = AuthorizationException.fromIntent(data);
             if (ex != null) {
                 if (promise != null) {
-                    handleAuthorizationException("authentication_error", ex, promise);
+                    promise.reject("authentication_error", String.valueOf(data));
+                    // handleAuthorizationException("authentication_error", ex, promise);
                 }
                 return;
             }

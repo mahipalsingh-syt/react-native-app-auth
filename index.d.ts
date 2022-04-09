@@ -3,6 +3,7 @@ export interface ServiceConfiguration {
   tokenEndpoint: string;
   revocationEndpoint?: string;
   registrationEndpoint?: string;
+  endSessionEndpoint?: string;
 }
 
 export type BaseConfiguration =
@@ -73,10 +74,16 @@ export type AuthConfiguration = BaseAuthConfiguration & {
   dangerouslyAllowInsecureHttpRequests?: boolean;
   customHeaders?: CustomHeaders;
   additionalHeaders?: AdditionalHeaders;
+  connectionTimeoutSeconds?: number;
   useNonce?: boolean;
   usePKCE?: boolean;
   warmAndPrefetchChrome?: boolean;
   skipCodeExchange?: boolean;
+};
+
+export type EndSessionConfiguration = BaseAuthConfiguration & {
+  additionalParameters?: { [name: string]: string };
+  dangerouslyAllowInsecureHttpRequests?: boolean;
 };
 
 export interface AuthorizeResult {
@@ -111,6 +118,17 @@ export interface RefreshConfiguration {
   refreshToken: string;
 }
 
+export interface LogoutConfiguration {
+  idToken: string;
+  postLogoutRedirectUrl: string;
+}
+
+export interface EndSessionResult {
+  idTokenHint: string;
+  postLogoutRedirectUri: string;
+  state: string;
+}
+
 export function prefetchConfiguration(config: AuthConfiguration): Promise<void>;
 
 export function register(config: RegistrationConfiguration): Promise<RegistrationResponse>;
@@ -126,6 +144,11 @@ export function revoke(
   config: BaseAuthConfiguration,
   revokeConfig: RevokeConfiguration
 ): Promise<void>;
+
+export function logout(
+  config: EndSessionConfiguration,
+  logoutConfig: LogoutConfiguration
+): Promise<EndSessionResult>;
 
 // https://tools.ietf.org/html/rfc6749#section-4.1.2.1
 type OAuthAuthorizationErrorCode =
@@ -150,7 +173,8 @@ type AppAuthErrorCode =
   | 'authentication_failed'
   | 'token_refresh_failed'
   | 'registration_failed'
-  | 'browser_not_found';
+  | 'browser_not_found'
+  | 'end_session_failed';
 
 type ErrorCode =
   | OAuthAuthorizationErrorCode

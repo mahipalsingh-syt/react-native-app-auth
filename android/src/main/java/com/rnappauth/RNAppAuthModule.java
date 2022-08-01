@@ -676,6 +676,17 @@ public class RNAppAuthModule extends ReactContextBaseJavaModule implements Activ
                 additionalParametersMap.remove("state");
             }
 
+            if (additionalParametersMap.containsKey("nonce")) {
+                authRequestBuilder.setNonce(additionalParametersMap.get("nonce"));
+                additionalParametersMap.remove("nonce");
+            
+           }
+            if (additionalParametersMap.containsKey("ui_locales")) {
+                authRequestBuilder.setUiLocales(additionalParametersMap.get("ui_locales"));
+                additionalParametersMap.remove("ui_locales");
+
+            }
+
             authRequestBuilder.setAdditionalParameters(additionalParametersMap);
         }
 
@@ -785,11 +796,9 @@ public class RNAppAuthModule extends ReactContextBaseJavaModule implements Activ
         final Activity currentActivity = getCurrentActivity();
 
         EndSessionRequest.Builder endSessionRequestBuilder =
-                new EndSessionRequest.Builder(
-                        serviceConfiguration,
-                        idTokenHint,
-                        Uri.parse(postLogoutRedirectUri)
-                );
+                new EndSessionRequest.Builder(serviceConfiguration)
+                        .setIdTokenHint(idTokenHint)
+                        .setPostLogoutRedirectUri(Uri.parse(postLogoutRedirectUri));
 
         if (additionalParametersMap != null) {
             if (additionalParametersMap.containsKey("state")) {

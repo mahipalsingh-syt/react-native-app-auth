@@ -88,6 +88,7 @@ export type AuthConfiguration = BaseAuthConfiguration & {
     | 'samsung'
     | 'samsungCustomTab'
   )[];
+  androidTrustedWebActivity?: boolean;
   iosPrefersEphemeralSession?: boolean;
 };
 
@@ -187,7 +188,8 @@ type AppAuthErrorCode =
   | 'registration_failed'
   | 'browser_not_found'
   | 'end_session_failed'
-  | 'authentication_error';
+  | 'authentication_error'
+  | 'run_time_exception';
 
 type ErrorCode =
   | OAuthAuthorizationErrorCode

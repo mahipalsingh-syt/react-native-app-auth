@@ -21,7 +21,7 @@ This library _should_ support any OAuth provider that implements the
 
 We only support the [Authorization Code Flow](https://oauth.net/2/grant-types/authorization-code/).
 
-### Tested OpenID providers
+## Tested OpenID providers
 
 These providers are OpenID compliant, which means you can use [autodiscovery](https://openid.net/specs/openid-connect-discovery-1_0.html).
 
@@ -34,8 +34,10 @@ These providers are OpenID compliant, which means you can use [autodiscovery](ht
 - [Keycloak](http://www.keycloak.org/) ([Example configuration](./docs/config-examples/keycloak.md))
 - [Azure Active Directory](https://docs.microsoft.com/en-us/azure/active-directory) ([Example configuration](./docs/config-examples/azure-active-directory.md))
 - [AWS Cognito](https://eu-west-1.console.aws.amazon.com/cognito) ([Example configuration](./docs/config-examples/aws-cognito.md))
+- [Asgardeo](https://asgardeo.io) ([Example configuration](./docs/config-examples/asgardeo.md))
+- [Microsoft](https://learn.microsoft.com/en-us/entra/identity-platform/v2-protocols-oidc) ([Example configuration](./docs/config-examples/microsoft.md))
 
-### Tested OAuth2 providers
+## Tested OAuth2 providers
 
 These providers implement the OAuth2 spec, but are not OpenID providers, which means you must configure the authorization and token endpoints yourself.
 
@@ -134,12 +136,13 @@ with optional overrides.
   - **token** - (`{ [key: string]: value }`) headers to be passed during token retrieval request.
   - **register** - (`{ [key: string]: value }`) headers to be passed during registration request.
 - **additionalHeaders** - (`{ [key: string]: value }`) _IOS_ you can specify additional headers to be passed for all authorize, refresh, and register requests.
-- **useNonce** - (`boolean`) (default: true) optionally allows not sending the nonce parameter, to support non-compliant providers
+- **useNonce** - (`boolean`) (default: true) optionally allows not sending the nonce parameter, to support non-compliant providers. To specify custom nonce, provide it in `additionalParameters` under the `nonce` key.
 - **usePKCE** - (`boolean`) (default: true) optionally allows not sending the code_challenge parameter and skipping PKCE code verification, to support non-compliant providers.
 - **skipCodeExchange** - (`boolean`) (default: false) just return the authorization response, instead of automatically exchanging the authorization code. This is useful if this exchange needs to be done manually (not client-side)
 - **iosCustomBrowser** - (`string`) (default: undefined) _IOS_ override the used browser for authorization, used to open an external browser. If no value is provided, the `SFAuthenticationSession` or `SFSafariViewController` are used.
 - **iosPrefersEphemeralSession** - (`boolean`) (default: `false`) _IOS_ indicates whether the session should ask the browser for a private authentication session.
 - **androidAllowCustomBrowsers** - (`string[]`) (default: undefined) _ANDROID_ override the used browser for authorization. If no value is provided, all browsers are allowed.
+- **androidTrustedWebActivity** - (`boolean`) (default: `false`) _ANDROID_ Use [`EXTRA_LAUNCH_AS_TRUSTED_WEB_ACTIVITY`](https://developer.chrome.com/docs/android/trusted-web-activity/) when opening web view.
 - **connectionTimeoutSeconds** - (`number`) configure the request timeout interval in seconds. This must be a positive number. The default values are 60 seconds on iOS and 15 seconds on Android.
 
 #### result
@@ -261,8 +264,13 @@ This is the result from the auth server
 ## Getting started
 
 ```sh
+yarn add react-native-app-auth
+```
+Or
+```sh
 npm install react-native-app-auth --save
 ```
+
 
 ## Setup
 
@@ -274,7 +282,7 @@ To setup the iOS project, you need to perform three steps:
 2. [Register redirect URL scheme](#register-redirect-url-scheme)
 3. [Define openURL callback in AppDelegate](#define-openurl-callback-in-appdelegate)
 
-##### Install native dependencies
+#### Install native dependencies
 
 This library depends on the native [AppAuth-ios](https://github.com/openid/AppAuth-iOS) project. To
 keep the React Native library agnostic of your dependency management method, the native libraries
@@ -313,7 +321,7 @@ AppAuth supports three options for dependency management.
     4. Add `AppAuth-iOS/Source` to your search paths of your target ("Build Settings -> "Header Search
        Paths").
 
-##### Register redirect URL scheme
+#### Register redirect URL scheme
 
 If you intend to support iOS 10 and older, you need to define the supported redirect URL schemes in
 your `Info.plist` as follows:
@@ -337,7 +345,7 @@ your `Info.plist` as follows:
   beginning of your OAuth Redirect URL, up to the scheme separator (`:`) character. E.g. if your redirect uri
   is `com.myapp://oauth`, then the url scheme will is `com.myapp`.
 
-##### Define openURL callback in AppDelegate
+#### Define openURL callback in AppDelegate
 
 You need to retain the auth session, in order to continue the
 authorization flow from the redirect. Follow these steps:
@@ -345,6 +353,54 @@ authorization flow from the redirect. Follow these steps:
 `RNAppAuth` will call on the given app's delegate via `[UIApplication sharedApplication].delegate`.
 Furthermore, `RNAppAuth` expects the delegate instance to conform to the protocol `RNAppAuthAuthorizationFlowManager`.
 Make `AppDelegate` conform to `RNAppAuthAuthorizationFlowManager` with the following changes to `AppDelegate.h`:
+
+##### For react-native >= 0.68
+Example setup can be see in the [Example app](./Example/ios)
+
+```diff
++ #import <React/RCTLinkingManager.h>
++ #import "RNAppAuthAuthorizationFlowManager.h"
+
+- @interface AppDelegate : RCTAppDelegate
++ @interface AppDelegate : RCTAppDelegate <RNAppAuthAuthorizationFlowManager>
+
++ @property(nonatomic, weak) id<RNAppAuthAuthorizationFlowManagerDelegate> authorizationFlowManagerDelegate;
+```
+
+Add the following code to `AppDelegate.mm` to support React Navigation deep linking and overriding browser behavior in the authorization process
+
+```diff
++ - (BOOL) application: (UIApplication *)application
++              openURL: (NSURL *)url
++              options: (NSDictionary<UIApplicationOpenURLOptionsKey, id> *) options
++ {
++   if ([self.authorizationFlowManagerDelegate resumeExternalUserAgentFlowWithURL:url]) {
++     return YES;
++   }
++   return [RCTLinkingManager application:application openURL:url options:options];
++ }
+```
+
+If you want to support universal links, add the following to `AppDelegate.mm` under `continueUserActivity`
+
+```diff
++ - (BOOL) application: (UIApplication *) application
++ continueUserActivity: (nonnull NSUserActivity *)userActivity
++   restorationHandler: (nonnull void (^)(NSArray<id<UIUserActivityRestoring>> * _Nullable))restorationHandler
++ {
++   if ([userActivity.activityType isEqualToString:NSUserActivityTypeBrowsingWeb]) {
++     if (self.authorizationFlowManagerDelegate) {
++       BOOL resumableAuth = [self.authorizationFlowManagerDelegate resumeExternalUserAgentFlowWithURL:userActivity.webpageURL];
++       if (resumableAuth) {
++         return YES;
++       }
++     }
++   }
++   return [RCTLinkingManager application:application continueUserActivity:userActivity restorationHandler:restorationHandler];
++ }
+```
+
+##### For react-native < 0.68
 
 ```diff
 + #import "RNAppAuthAuthorizationFlowManager.h"
@@ -409,7 +465,7 @@ class AppDelegate: UIApplicationDelegate, RNAppAuthAuthorizationFlowManager { //
       _ app: UIApplication,
       open url: URL,
       options: [UIApplicationOpenURLOptionsKey: Any] = [:]) -> Bool {
-      return authorizationFlowManagerDelegate?.resumeExternalUserAgentFlowWithURL(with: url) ?? false
+      return authorizationFlowManagerDelegate?.resumeExternalUserAgentFlow(with: url) ?? false
   }
 }
 ```
@@ -473,7 +529,7 @@ Values are in the `code` field of the rejected Error object.
 - `registration_failed` - could not register
 - `browser_not_found` (Android only) - no suitable browser installed
 
-#### Note about client secrets
+## Note about client secrets
 
 Some authentication providers, including examples cited below, require you to provide a client secret. The authors of the AppAuth library
 
@@ -481,11 +537,15 @@ Some authentication providers, including examples cited below, require you to pr
 
 Having said this, in some cases using client secrets is unavoidable. In these cases, a `clientSecret` parameter can be provided to `authorize`/`refresh` calls when performing a token request.
 
-#### Token Storage
+## Token Storage
 
 Recommendations on secure token storage can be found [here](./docs/token-storage.md).
 
-#### Maintenance Status
+## Contributing
+
+Please see our [contributing guide](./.github/CONTRIBUTING.md).
+
+## Maintenance Status
 
 **Active:** Formidable is actively working on this project, and we expect to continue for work for the foreseeable future. Bug reports, feature requests and pull requests are welcome.
 
